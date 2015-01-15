@@ -15,7 +15,11 @@ module Norikra
 
       def process_async(events)
         # write events to STDOUT specified times, in background
-        STDOUT.puts @query_name + "\t" + JSON.dump(e)
+        events.each do |e|
+          @repeat.times do |i|
+            STDOUT.puts @query_name + "\t#{i + 1}\t" + JSON.dump(e)
+          end
+        end
       end
     end
   end
