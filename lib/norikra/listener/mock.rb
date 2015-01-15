@@ -13,11 +13,11 @@ module Norikra
         @repeat = Mock.check(query_group).to_i
       end
 
-      def process_async(events)
+      def process_async(events) # [ [unixtime, {event} ], ...
         # write events to STDOUT specified times, in background
-        events.each do |e|
+        events.each do |time, e|
           @repeat.times do |i|
-            STDOUT.puts @query_name + "\t#{i + 1}\t" + JSON.dump(e)
+            STDOUT.puts @query_name + "\t#{i + 1}\t#{Time.at(time)}\t" + JSON.dump(e)
           end
         end
       end
