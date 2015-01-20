@@ -8,8 +8,11 @@ module Norikra
         query_group_name && query_group_name =~ /^MOCK\((\d+)\)$/ && $1
       end
 
+      attr_accessor :stdout
+
       def initialize(query_name, query_group, events_statistics)
         super
+        @stdout = STDOUT
         @repeat = Mock.check(query_group).to_i
       end
 
@@ -17,7 +20,7 @@ module Norikra
         # write events to STDOUT specified times, in background
         events.each do |time, e|
           @repeat.times do |i|
-            STDOUT.puts @query_name + "\t#{i + 1}\t#{Time.at(time)}\t" + JSON.dump(e)
+            @stdout.puts @query_name + "\t#{i + 1}\t#{Time.at(time)}\t" + JSON.dump(e)
           end
         end
       end
