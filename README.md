@@ -62,7 +62,7 @@ module Norikra
   module Listener
     class MyListener < Norikra::Listener::Base
       def self.label
-        "MY_NAME"
+        "MY_NAME" # label must matches pattern /^[_A-Z]+$/
       end
 
       def initialize(argument, query_name, query_group)
@@ -85,6 +85,8 @@ module Norikra
   end
 end
 ```
+
+This listener is applied for query group name `MY_NAME(...)`. Argument string in the parenthesis will be set in `@argument`.
 
 ### Sync or Async
 
@@ -111,19 +113,113 @@ Sync listener is good for these cases:
 
 ### Sync Listener
 
-TBD
+For sync listener plugins, add `#process_sync` instance method with 2 arguments.
+
+```ruby
+  def process_sync(news, olds)
+    news.each do |event|
+      # query_group: MY_NAME(DESTINATION)
+      send_to_anywhere_specified_by_argument(@argument, query_name: @query_name, event: event)
+    end
+  end
+```
+
+Query output events for latest view are in `news` as Array of Hash objects, and events of previous view are in `olds`.
+
+Norikra engine calls `#process_sync` per every query output timing. `#process_sync` should return as soon as possible. Use async listener for output methods with large latency.
 
 ### Async Listener
 
-TBD
+Async listener is to send events over large delay, or as batch writing. Add `#process_async` with 1 argument.
+
+```ruby
+  def process_async(events)
+    events.each do |event|
+      # query_group: MY_NAME(DESTINATION)
+      send_to_anywhere_specified_by_argument(@argument, query_name: @query_name, event: event)
+    end
+  end
+```
+
+`events` is an Array of Hash events, which contain all output events between async calls of `#process_async`. This method is called per 0.1 seconds in default (plugin can overwrite this interval by setting `@async_interval` in `#initialize`).
+
+```ruby
+  def initialize(argument, query_name, query_group)
+    super
+    @async_interval = 1 # 1 #process_async call per 1 second
+  end
+```
 
 ### Listeners with engine/output pool
 
-TBD
+Norikra engine assigns its engine itself and output memory pool in `@engine` and `@output_pool` of listener plugins if `#engine=` or/and `#output_pool=` methods are defined.
+
+```ruby
+require "norikra/listener"
+
+module Norikra
+  module Listener
+    class MyListener < Norikra::Listener::Base
+      def self.label
+        "MY_NAME"
+      end
+
+      attr_writer :engine # this defines #engine=
+      attr_writer :output_pool # this defines #output_pool=
+
+      def process_sync(news, olds)
+        # use @engine and/or @output_pool here!
+      end
+    end
+  end
+end
+```
+
+**WARNING: Using engine/output_pool can break Norikra itself very easily!**
+
+* engine
+  * instance of Norikra::Engine, to re-send query output events into specified target
+  * `@engine.send(TARGET_NAME, events)`
+  * use engine to make plugins like `LOOPBACK()` with some data transformations
+* output_pool
+  * instance of Norikra::OutputPool, to store events in memory store to be fetched by HTTP API (or CLI)
+  * `@output_pool.push(@query_name, modified_query_group, events)`
+  * use output_pool to make plugins just as same with default output of queries, with some data transformations
+  * `modified_query_group` may be `@query_group`, or modified query group value, or just `@argument`
 
 ### Writing tests
 
-TBD
+There're no special topic to write tests. Write simple tests with rspec3.
+
+```ruby
+require 'norikra/listener/my_listener'
+
+describe Norikra::Listener::MyListener do
+  it 'works well' # TODO: write!
+end
+```
+
+Norikra has some classes to stub engine and output_pool.
+
+```ruby
+require 'norikra/listener_spec_helper'
+include Norikra::ListenerSpecHelper
+
+dummy_engine = DummyEngine.new
+dummy_pool = DummyOutputPool.new
+
+listener_instance = Norikra::Listener::MyListener.new('argument', 'query_name', 'MY_LISTENER(argument)')
+listener_instance.engine = dummy_engine
+listener_instance.output_pool = dummy_pool
+
+# re-send events to engine in listener
+
+expect(dummy_engine.events).to eql([events_tobe_sent])
+
+# store events into output pools in listener
+
+expect(dummy_pool.pool['query_group']['query_name']).to eql([events_tobe_stored])
+```
 
 ## TODO
 
