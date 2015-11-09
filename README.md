@@ -17,7 +17,7 @@ rbenv rehash
 2. Generate repository
 ```
 bundle gem norikra-listener-yours
-cd norikra-udf-users
+cd norikra-listener-users
 rbenv local jruby-1.7.18
 ```
 3. Edit gemspec
